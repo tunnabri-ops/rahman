@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tv, Menu, X, RefreshCw, Layers, Signal } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Channel } from './types';
 import { VideoPlayer } from './components/VideoPlayer';
 import { ChannelList } from './components/ChannelList';
+import { MovieSearch } from './components/MovieSearch';
 import {
   PlaylistModal,
   PlaylistSource,
@@ -66,6 +67,8 @@ export default function App() {
       url: REPO_M3U_URL,
     };
   });
+
+  const [appMode, setAppMode] = useState<'live' | 'movies'>('live');
 
   // Security: Block Right Click & DevTools shortcuts
   useEffect(() => {
@@ -228,13 +231,13 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#060609] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] text-slate-200 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
       {/* Header */}
-      <header className="h-16 border-b border-slate-800 bg-slate-950/95 backdrop-blur flex items-center justify-between px-3 sm:px-6 shrink-0 z-20 sticky top-0">
+      <header className="h-16 border-b border-white/[0.05] bg-[#0a0a0f]/80 backdrop-blur-md flex items-center justify-between px-3 sm:px-6 shrink-0 z-20 sticky top-0 shadow-lg shadow-black/20">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
             aria-label="Toggle channels menu"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -244,27 +247,27 @@ export default function App() {
               initial={{ scale: 0.8, rotate: -10 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 300 }}
-              className="h-10 flex items-center justify-center bg-white rounded-lg p-1"
+              className="h-10 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-xl p-1.5 shadow-lg shadow-indigo-500/10 ring-1 ring-white/10"
             >
               <img 
-                src="https://raw.githubusercontent.com/abukayuum/NINJA-TV/main/logo/image.png" 
+                src="/logo.png" 
                 alt="NRT Logo" 
-                className="h-full object-contain"
+                className="h-full object-contain mix-blend-multiply"
                 onError={(e) => {
                   // Fallback to Tv icon if image fails to load
                   e.currentTarget.style.display = 'none';
-                  e.currentTarget.parentElement?.classList.add('bg-indigo-600', 'p-1.5', 'shadow-sm', 'shadow-indigo-600/30');
-                  e.currentTarget.parentElement?.classList.remove('bg-white', 'p-1');
+                  e.currentTarget.parentElement?.classList.add('bg-indigo-500/20', 'p-1.5');
+                  e.currentTarget.parentElement?.classList.remove('bg-white/90', 'p-1.5', 'mix-blend-multiply');
                   const fallback = document.createElement('div');
-                  fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>';
+                  fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-400"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>';
                   e.currentTarget.parentElement?.appendChild(fallback);
                 }}
               />
             </motion.div>
             <div className="flex flex-col">
-              <h1 className="text-base sm:text-lg font-bold tracking-wider text-white flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
                 NRT STREAMING
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider hidden sm:inline">
+                <span className="text-[9px] bg-indigo-500/20 text-indigo-300 font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-widest hidden sm:inline border border-indigo-500/30">
                   Live
                 </span>
               </h1>
@@ -273,23 +276,48 @@ export default function App() {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-4">
+          
+          {/* Mode Switcher */}
+          <div className="flex bg-black/40 p-1 rounded-xl border border-white/[0.05] shadow-inner">
+            <button
+              onClick={() => setAppMode('live')}
+              className={`px-3 py-1 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer ${
+                appMode === 'live' 
+                  ? 'bg-white/10 text-white shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+              }`}
+            >
+              Live TV
+            </button>
+            <button
+              onClick={() => setAppMode('movies')}
+              className={`px-3 py-1 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer ${
+                appMode === 'movies' 
+                  ? 'bg-indigo-500/20 text-indigo-300 shadow-sm border border-indigo-500/30' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+              }`}
+            >
+              Movies
+            </button>
+          </div>
+
           {/* Live Status Badge */}
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-xs text-slate-300 shadow-inner shadow-white/[0.02]"
           >
-            <Signal className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="font-medium text-slate-200">{channels.length}</span>
-            <span className="text-slate-400">Channels</span>
+            <Signal className="w-3.5 h-3.5 text-emerald-400 animate-pulse drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+            <span className="font-semibold text-slate-200">{channels.length}</span>
+            <span className="text-slate-400/80">Channels</span>
           </motion.div>
 
           {/* Sync / Refresh Streams */}
           <button
             onClick={handleRefreshRepo}
             disabled={isLoading || isUpdating}
-            className="text-xs sm:text-sm font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+            className="text-xs sm:text-sm font-medium text-slate-300 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-sm"
             title="Sync and reload latest live streams"
           >
             <RefreshCw
@@ -304,24 +332,28 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Sidebar Channel List (Desktop & Mobile Drawer) */}
+        {appMode === 'live' ? (
+          <>
+            {/* Sidebar Channel List (Desktop & Mobile Drawer) */}
         <aside
           className={`absolute inset-y-0 left-0 z-30 w-72 sm:w-80 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
             isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <ChannelList
-            channels={channels}
-            activeChannel={activeChannel}
-            onSelectChannel={handleSelectChannel}
-            favorites={favorites}
-            recentChannels={recentChannels}
-            onToggleFavorite={toggleFavorite}
-            onOpenPlaylistModal={() => {
-              setIsPlaylistModalOpen(true);
-              setIsMobileMenuOpen(false);
-            }}
-          />
+          <div className="h-full bg-[#0a0a0f]/80 backdrop-blur-xl border-r border-white/[0.05] lg:bg-transparent lg:border-none shadow-2xl lg:shadow-none">
+            <ChannelList
+              channels={channels}
+              activeChannel={activeChannel}
+              onSelectChannel={handleSelectChannel}
+              favorites={favorites}
+              recentChannels={recentChannels}
+              onToggleFavorite={toggleFavorite}
+              onOpenPlaylistModal={() => {
+                setIsPlaylistModalOpen(true);
+                setIsMobileMenuOpen(false);
+              }}
+            />
+          </div>
         </aside>
 
         {/* Mobile Sidebar Overlay Backdrop */}
@@ -331,47 +363,43 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-20 lg:hidden backdrop-blur-xs"
+              className="fixed inset-0 bg-[#060609]/80 z-20 lg:hidden backdrop-blur-sm"
               onClick={() => setIsMobileMenuOpen(false)}
             />
           )}
         </AnimatePresence>
 
         {/* Main Player & Stream View */}
-        <main className="flex-1 flex flex-col overflow-y-auto w-full">
+        <main className="flex-1 flex flex-col overflow-y-auto w-full relative z-10">
           {isLoading ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
-              <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-              <p className="text-sm text-slate-400">Loading playlist streams...</p>
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
+              <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
+              <p className="text-sm text-slate-400 font-medium tracking-wide animate-pulse">Loading live streams...</p>
             </div>
           ) : error ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-              <p className="mb-4 max-w-md">{error}</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => loadActivePlaylist(activeSource)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 text-sm font-medium transition cursor-pointer"
-                >
-                  Retry Load
-                </button>
-                <button
-                  onClick={() => setIsPlaylistModalOpen(true)}
-                  className="px-4 py-2 bg-slate-800 text-slate-200 rounded-lg hover:bg-slate-700 text-sm font-medium transition cursor-pointer"
-                >
-                  Change Playlist Source
-                </button>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 max-w-md backdrop-blur-md">
+                <p className="mb-5 text-red-200 font-medium leading-relaxed">{error}</p>
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => loadActivePlaylist(activeSource)}
+                    className="px-5 py-2.5 bg-red-500/20 text-red-200 rounded-xl hover:bg-red-500/30 text-sm font-semibold transition-colors cursor-pointer border border-red-500/30"
+                  >
+                    Retry Connection
+                  </button>
+                </div>
               </div>
             </div>
           ) : activeChannel ? (
             <motion.div 
               key={activeChannel.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="w-full max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 space-y-5"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-[1400px] mx-auto p-2 sm:p-4 lg:p-6 space-y-6"
             >
-              {/* Responsive Video Player */}
-              <div className="w-full relative">
+              {/* Responsive Video Player Stage */}
+              <div className="w-full relative rounded-2xl overflow-hidden ring-1 ring-white/[0.05] shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-black">
                 <VideoPlayer 
                   channel={activeChannel} 
                   onPlayNextChannel={() => {
@@ -406,9 +434,10 @@ export default function App() {
               </div>
 
               {/* Now Playing Channel Card */}
-              <div className="bg-slate-900 rounded-xl p-4 sm:p-6 border border-slate-800 shadow-md">
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/5 rounded-xl flex items-center justify-center p-2 shrink-0 border border-slate-800">
+              <div className="bg-white/[0.02] backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-white/[0.05] shadow-xl relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="flex items-start gap-5 relative z-10">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-black/40 rounded-xl flex items-center justify-center p-2.5 shrink-0 border border-white/[0.05] shadow-inner">
                     {activeChannel.logo ? (
                       <img
                         src={activeChannel.logo}
@@ -426,38 +455,47 @@ export default function App() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <span className="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 ring-inset ring-red-500/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5 animate-pulse" />
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="inline-flex items-center rounded-md bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400 ring-1 ring-inset ring-red-500/20 uppercase tracking-widest">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5 animate-[pulse_2s_ease-in-out_infinite]" />
                         LIVE
                       </span>
-                      <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs font-medium text-indigo-400 ring-1 ring-inset ring-indigo-500/20 uppercase tracking-wider">
-                        {activeChannel.category}
+                      <span className="inline-flex items-center rounded-md bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-300 ring-1 ring-inset ring-indigo-500/20 uppercase tracking-widest shadow-[0_0_8px_rgba(99,102,241,0.1)]">
+                        {activeChannel.category || 'Uncategorized'}
                       </span>
-                      <span className="text-xs text-slate-500">
-                        {activeChannel.streams?.length || 1} Server
-                        {(activeChannel.streams?.length || 1) > 1 ? 's' : ''} available
+                      <span className="text-[11px] font-medium text-slate-400 bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.05]">
+                        {activeChannel.streams?.length || 1} Server{(activeChannel.streams?.length || 1) > 1 ? 's' : ''}
                       </span>
                     </div>
 
-                    <h2 className="text-xl sm:text-2xl font-bold text-white truncate tracking-tight">
+                    <h2 className="text-xl sm:text-2xl font-extrabold text-white truncate tracking-tight drop-shadow-sm">
                       {activeChannel.name}
                     </h2>
-                    <p className="mt-1 text-xs sm:text-sm text-slate-400 leading-relaxed">
-                      Now streaming live on NRT STREAMING
+                    <p className="mt-1 text-xs sm:text-sm text-slate-400 font-medium tracking-wide">
+                      Now streaming on NRT
                     </p>
                   </div>
                 </div>
               </div>
             </motion.div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2 p-6">
-              <Tv className="w-10 h-10 text-slate-600 mb-2" />
-              <p className="text-base font-medium text-slate-400">No channel selected</p>
-              <p className="text-xs text-slate-500">Choose a channel from the left sidebar to start streaming</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4 p-6">
+              <div className="w-20 h-20 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center">
+                <Tv className="w-8 h-8 text-slate-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-bold text-slate-300 tracking-tight">No channel selected</p>
+                <p className="text-sm text-slate-500 mt-1">Choose a channel from the sidebar to start streaming</p>
+              </div>
             </div>
           )}
         </main>
+          </>
+        ) : (
+          <main className="flex-1 flex flex-col overflow-hidden w-full relative z-10">
+             <MovieSearch />
+          </main>
+        )}
       </div>
 
       {/* Playlist Manager Modal */}

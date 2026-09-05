@@ -504,8 +504,7 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
           ref={videoRef}
           controls
           playsInline
-          /* @ts-expect-error - React doesn't fully support this modern HTML attribute natively, so it has to be lowercase */
-          autopictureinpicture="true"
+          autoPictureInPicture
           className="w-full h-full object-contain"
         />
 
@@ -584,33 +583,35 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
       </div>
 
       {/* Control & Info Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-1">
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-1 rounded font-mono text-[11px] sm:text-xs text-slate-300">
-            <Film className="w-3.5 h-3.5 text-indigo-400" />
-            Format: {currentStream ? getFormatBadge(currentStream.url, Boolean(currentStream.drm)) : 'AUTO'}
+          <span className="inline-flex items-center gap-1.5 bg-black/40 border border-white/[0.05] px-2.5 py-1.5 rounded-lg font-mono text-[10px] sm:text-[11px] text-slate-300 shadow-inner">
+            <Film className="w-3 h-3 text-indigo-400" />
+            <span className="opacity-70">FORMAT:</span> {currentStream ? getFormatBadge(currentStream.url, Boolean(currentStream.drm)) : 'AUTO'}
           </span>
-          <span className="inline-flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-1 rounded font-mono text-[11px] sm:text-xs text-slate-300">
-            <Play className="w-3.5 h-3.5 text-emerald-400" />
-            Engine: {activeEngine.toUpperCase()}
+          <span className="inline-flex items-center gap-1.5 bg-black/40 border border-white/[0.05] px-2.5 py-1.5 rounded-lg font-mono text-[10px] sm:text-[11px] text-slate-300 shadow-inner">
+            <Play className="w-3 h-3 text-emerald-400" />
+            <span className="opacity-70">ENGINE:</span> {activeEngine.toUpperCase()}
           </span>
         </div>
         
         {/* Quick Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
            {/* PiP Button (Only shows if supported) */}
            {typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && (
              <button
                 onClick={togglePiP}
-                className="px-2.5 py-1 text-[11px] sm:text-xs font-medium bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white rounded flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700 hover:border-indigo-500"
+                className="px-3 py-1.5 text-[11px] sm:text-xs font-semibold bg-white/[0.05] hover:bg-indigo-500/20 text-slate-300 hover:text-indigo-200 rounded-lg flex items-center gap-2 transition-all cursor-pointer border border-white/[0.05] hover:border-indigo-500/30 shadow-sm"
                 title="Picture in Picture (P)"
              >
-               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" ry="2"/><rect width="8" height="5" x="11" y="12" rx="1" ry="1"/></svg>
-               <span className="hidden sm:inline">PiP</span>
+               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" ry="2"/><rect width="8" height="5" x="11" y="12" rx="1" ry="1"/></svg>
+               <span className="hidden sm:inline tracking-wide">PiP MODE</span>
              </button>
            )}
-           <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-500 font-mono bg-slate-900 px-2 py-1 rounded border border-slate-800/50">
-             <span>Space: Play/Pause</span> • <span>F: Fullscreen</span> • <span>M: Mute</span>
+           <div className="hidden md:flex items-center gap-2 text-[10px] text-slate-400 font-medium bg-black/20 px-3 py-1.5 rounded-lg border border-white/[0.02]">
+             <span><kbd className="font-mono bg-white/10 px-1 rounded mx-0.5">Space</kbd> Play/Pause</span> • 
+             <span><kbd className="font-mono bg-white/10 px-1 rounded mx-0.5">F</kbd> Fullscreen</span> • 
+             <span><kbd className="font-mono bg-white/10 px-1 rounded mx-0.5">M</kbd> Mute</span>
            </div>
         </div>
       </div>
