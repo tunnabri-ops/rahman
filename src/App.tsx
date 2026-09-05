@@ -372,7 +372,37 @@ export default function App() {
             >
               {/* Responsive Video Player */}
               <div className="w-full relative">
-                <VideoPlayer channel={activeChannel} />
+                <VideoPlayer 
+                  channel={activeChannel} 
+                  onPlayNextChannel={() => {
+                    // Try to find the exact list of channels currently displayed to the user
+                    const filteredElements = Array.from(document.querySelectorAll('[role="listbox"] button[data-channel-id]'));
+                    const filteredIds = filteredElements.map(el => el.getAttribute('data-channel-id')).filter(Boolean) as string[];
+                    
+                    if (filteredIds.length > 0) {
+                      const currentIndex = filteredIds.indexOf(activeChannel.id);
+                      if (currentIndex !== -1 && currentIndex < filteredIds.length - 1) {
+                        const nextId = filteredIds[currentIndex + 1];
+                        const nextChannel = channels.find(c => c.id === nextId);
+                        if (nextChannel) setActiveChannel(nextChannel);
+                        return;
+                      } else if (filteredIds.length > 0) {
+                        // Loop back to start of filtered list
+                        const firstChannel = channels.find(c => c.id === filteredIds[0]);
+                        if (firstChannel) setActiveChannel(firstChannel);
+                        return;
+                      }
+                    }
+
+                    // Fallback to main channels array if DOM query fails
+                    const currentIndex = channels.findIndex(c => c.id === activeChannel.id);
+                    if (currentIndex !== -1 && currentIndex < channels.length - 1) {
+                      setActiveChannel(channels[currentIndex + 1]);
+                    } else if (channels.length > 0) {
+                      setActiveChannel(channels[0]); // Loop back to start
+                    }
+                  }}
+                />
               </div>
 
               {/* Now Playing Channel Card */}

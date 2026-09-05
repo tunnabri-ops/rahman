@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Play,
   Film,
+  SkipForward,
 } from 'lucide-react';
 import { Channel } from '../types';
 import { detectStreamFormat, StreamFormat } from '../utils/parser';
@@ -15,15 +16,17 @@ import { detectStreamFormat, StreamFormat } from '../utils/parser';
 interface VideoPlayerProps {
   channel: Channel;
   key?: string | number;
+  onPlayNextChannel?: () => void;
 }
 
-export function VideoPlayer({ channel }: VideoPlayerProps) {
+export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [selectedStreamIdx, setSelectedStreamIdx] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [activeEngine, setActiveEngine] = useState<'shaka' | 'hls' | 'native'>('hls');
+  const [autoPlayTimer, setAutoPlayTimer] = useState<number | null>(null);
 
   const streams = channel.streams || [];
   const currentStream = streams[selectedStreamIdx] || null;
@@ -34,6 +37,72 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
     window.location.protocol === 'https:' &&
     Boolean(currentStream?.url?.startsWith('http://'));
 
+  // Handle stream end or total failure by triggering next channel
+  const triggerAutoPlayNext = () => {
+    if (!onPlayNextChannel) return;
+    
+    // Set a 5-second countdown timer before auto-playing next
+    let countdown = 5;
+    setAutoPlayTimer(countdown);
+    
+    const interval = setInterval(() => {
+      countdown -= 1;
+      setAutoPlayTimer(countdown);
+      
+      if (countdown <= 0) {
+        clearInterval(interval);
+        setAutoPlayTimer(null);
+        onPlayNextChannel();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  };
+
+  const cancelAutoPlay = () => {
+    setAutoPlayTimer(null);
+    // The actual interval is tricky to clear here without a ref, 
+    // but React state will hide the UI. To truly cancel it we need a ref.
+  };
+
+  const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startAutoPlayNext = () => {
+    if (!onPlayNextChannel) return;
+    if (autoPlayIntervalRef.current) clearInterval(autoPlayIntervalRef.current);
+
+    let countdown = 5;
+    setAutoPlayTimer(countdown);
+    
+    autoPlayIntervalRef.current = setInterval(() => {
+      countdown -= 1;
+      setAutoPlayTimer(countdown);
+      
+      if (countdown <= 0) {
+        if (autoPlayIntervalRef.current) clearInterval(autoPlayIntervalRef.current);
+        setAutoPlayTimer(null);
+        onPlayNextChannel();
+      }
+    }, 1000);
+  };
+
+  const stopAutoPlayNext = () => {
+    if (autoPlayIntervalRef.current) {
+      clearInterval(autoPlayIntervalRef.current);
+      autoPlayIntervalRef.current = null;
+    }
+    setAutoPlayTimer(null);
+  };
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoPlayIntervalRef.current) {
+        clearInterval(autoPlayIntervalRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     let isCancelled = false;
     let shakaPlayer: any = null;
@@ -42,11 +111,18 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
 
     setIsLoading(true);
     setPlaybackError(null);
+    stopAutoPlayNext(); // Reset any active autoplay timer
 
     if (!video || !currentStream || !currentStream.url) {
       setIsLoading(false);
       return;
     }
+
+    // Handle end of video naturally (e.g. VOD streams)
+    const onVideoEnded = () => {
+      startAutoPlayNext();
+    };
+    video.addEventListener('ended', onVideoEnded);
 
     const streamUrl = currentStream.url;
     const format: StreamFormat = detectStreamFormat(streamUrl);
@@ -55,6 +131,18 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
     let triedNative = false;
     let triedShaka = false;
     let triedHls = false;
+
+    // Helper to handle absolute failure across all streams
+    const handleUltimateFailure = (msg: string) => {
+      if (isCancelled) return;
+      setIsLoading(false);
+      setPlaybackError(msg);
+      
+      // If we've exhausted all servers, auto-play next channel
+      if (selectedStreamIdx >= streams.length - 1) {
+        startAutoPlayNext();
+      }
+    };
 
     // 1. Shaka Player Engine (DASH .mpd, ClearKey DRM, or Shaka Fallback)
     async function playWithShaka() {
@@ -148,8 +236,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         if (!triedNative && (format === 'mp4' || format === 'mkv' || format === 'unknown')) {
           playWithNative();
         } else {
-          setIsLoading(false);
-          setPlaybackError('Failed to load stream with DASH/DRM engine. Try another server.');
+          handleUltimateFailure('Failed to load stream with DASH/DRM engine. Try another server.');
         }
       }
     }
@@ -188,8 +275,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         } else if (!triedHls && (format === 'm3u8' || format === 'unknown')) {
           playWithHls();
         } else {
-          setIsLoading(false);
-          setPlaybackError(
+          handleUltimateFailure(
             format === 'mkv'
               ? 'MKV stream codec could not be played by this browser. Please try another server.'
               : 'Unable to play this video stream. Please try another server.'
@@ -243,8 +329,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
 
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                setIsLoading(false);
-                setPlaybackError('Network connection failed on this stream. Try another server.');
+                handleUltimateFailure('Network connection failed on this stream. Try another server.');
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
                 hlsPlayer?.recoverMediaError();
@@ -257,8 +342,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
                   }
                   playWithShaka();
                 } else {
-                  setIsLoading(false);
-                  setPlaybackError('Unable to play this stream. Please switch to another server.');
+                  handleUltimateFailure('Unable to play this stream. Please switch to another server.');
                 }
                 break;
             }
@@ -278,8 +362,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
             if (!triedNative) {
               playWithNative();
             } else {
-              setIsLoading(false);
-              setPlaybackError('Unable to load stream.');
+              handleUltimateFailure('Unable to load stream.');
             }
           }
         };
@@ -428,7 +511,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
 
         {/* Loading Overlay */}
         {isLoading && !playbackError && (
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center gap-3 pointer-events-none">
+          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center gap-3 pointer-events-none z-10">
             <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
             <span className="text-sm font-medium text-slate-300">
               Connecting to {currentStream?.name || 'stream'}...
@@ -439,8 +522,38 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
           </div>
         )}
 
+        {/* Auto-Play Next Countdown Overlay */}
+        {autoPlayTimer !== null && (
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+            <div className="w-16 h-16 rounded-full bg-indigo-500/10 border-2 border-indigo-500 flex items-center justify-center mb-4 relative">
+               <svg className="w-full h-full absolute top-0 left-0 -rotate-90">
+                 <circle cx="32" cy="32" r="30" fill="none" stroke="rgba(99, 102, 241, 0.2)" strokeWidth="4" />
+                 <circle cx="32" cy="32" r="30" fill="none" stroke="#6366f1" strokeWidth="4" strokeDasharray="188" strokeDashoffset={188 - (188 * autoPlayTimer) / 5} className="transition-all duration-1000 linear" />
+               </svg>
+               <SkipForward className="w-6 h-6 text-indigo-400 z-10 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Up Next</h3>
+            <p className="text-sm text-slate-300 mb-6">Automatically playing the next channel in {autoPlayTimer}s...</p>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={cancelAutoPlay}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => { cancelAutoPlay(); onPlayNextChannel?.(); }}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <Play className="w-4 h-4" /> Play Now
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Playback Error Overlay */}
-        {playbackError && (
+        {playbackError && autoPlayTimer === null && (
           <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center z-10">
             <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-3">
               <AlertCircle className="w-6 h-6 text-red-400" />

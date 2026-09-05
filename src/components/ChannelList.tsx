@@ -153,7 +153,7 @@ export function ChannelList({
       </div>
 
       {/* Channel Items List */}
-      <div className="p-2 flex-1 overflow-y-auto scrollbar-none space-y-1">
+      <div className="p-2 flex-1 overflow-y-auto scrollbar-none space-y-1" role="listbox">
         {filteredChannels.length === 0 ? (
           <div className="text-center py-10 text-slate-500 text-sm flex flex-col items-center gap-2">
             {activeTab === 'favorites' ? (
@@ -175,6 +175,8 @@ export function ChannelList({
                 transition={{ duration: 0.2, delay: Math.min(i * 0.02, 0.5) }}
                 key={`${channel.id}-${activeTab}`} // key changing ensures animation re-runs on tab switch
                 onClick={() => onSelectChannel(channel)}
+                data-channel-id={channel.id}
+                role="option"
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-left cursor-pointer group ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
