@@ -421,7 +421,8 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
           ref={videoRef}
           controls
           playsInline
-          autoPictureInPicture
+          /* @ts-expect-error - React doesn't fully support this modern HTML attribute natively, so it has to be lowercase */
+          autopictureinpicture="true"
           className="w-full h-full object-contain"
         />
 

@@ -244,9 +244,22 @@ export default function App() {
               initial={{ scale: 0.8, rotate: -10 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 300 }}
-              className="bg-indigo-600 p-1.5 rounded-lg shadow-sm shadow-indigo-600/30"
+              className="h-10 flex items-center justify-center bg-white rounded-lg p-1"
             >
-              <Tv className="w-5 h-5 text-white" />
+              <img 
+                src="https://raw.githubusercontent.com/abukayuum/NINJA-TV/main/logo/image.png" 
+                alt="NRT Logo" 
+                className="h-full object-contain"
+                onError={(e) => {
+                  // Fallback to Tv icon if image fails to load
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.parentElement?.classList.add('bg-indigo-600', 'p-1.5', 'shadow-sm', 'shadow-indigo-600/30');
+                  e.currentTarget.parentElement?.classList.remove('bg-white', 'p-1');
+                  const fallback = document.createElement('div');
+                  fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>';
+                  e.currentTarget.parentElement?.appendChild(fallback);
+                }}
+              />
             </motion.div>
             <div className="flex flex-col">
               <h1 className="text-base sm:text-lg font-bold tracking-wider text-white flex items-center gap-2">
@@ -271,23 +284,6 @@ export default function App() {
             <span className="font-medium text-slate-200">{channels.length}</span>
             <span className="text-slate-400">Channels</span>
           </motion.div>
-
-          {/* Playlist Manager Button */}
-          <button
-            onClick={() => setIsPlaylistModalOpen(true)}
-            className="text-xs sm:text-sm font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
-            title="Manage and update playlist sources"
-          >
-            <Layers className="w-4 h-4 text-indigo-400" />
-            <span>Playlist</span>
-            <span className="text-[11px] bg-slate-800 text-indigo-300 px-1.5 py-0.2 rounded font-mono hidden md:inline">
-              {activeSource.type === 'repo-m3u'
-                ? 'M3U'
-                : activeSource.type === 'repo-json'
-                ? 'JSON'
-                : 'Custom'}
-            </span>
-          </button>
 
           {/* Sync / Refresh Streams */}
           <button

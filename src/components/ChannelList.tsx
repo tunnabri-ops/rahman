@@ -75,15 +75,6 @@ export function ChannelList({
             Channels
           </h2>
           <div className="flex items-center gap-2">
-            {onOpenPlaylistModal && (
-              <button
-                onClick={onOpenPlaylistModal}
-                className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-2 py-1 rounded-md transition-colors font-medium cursor-pointer"
-                title="Manage Playlist and Uploads"
-              >
-                Playlist
-              </button>
-            )}
             <span className="text-xs bg-slate-800 text-slate-400 font-medium px-2 py-0.5 rounded-full border border-slate-700">
               {filteredChannels.length}
             </span>
