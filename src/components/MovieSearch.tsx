@@ -111,9 +111,10 @@ export function MovieSearch() {
         
         <div className="flex-1 w-full relative bg-black flex items-center justify-center">
           <iframe
-            src={`https://vidsrc.me/embed/movie?tmdb=${selectedMovie.id}`}
+            src={`https://vidlink.pro/movie/${selectedMovie.id}`}
             className="w-full h-full border-0 absolute inset-0"
             allowFullScreen
+            sandbox="allow-scripts allow-same-origin allow-presentation"
             title={selectedMovie.title}
           />
         </div>

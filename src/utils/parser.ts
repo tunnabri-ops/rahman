@@ -25,7 +25,14 @@ export function parseStreamOptions(rawUrl: string): StreamOption[] {
 
     // Extract configurations separated by |
     const parts = streamPart.split('|');
-    const url = parts[0].trim();
+    let url = parts[0].trim();
+    
+    // Auto-convert .ts URLs to .m3u8 for web browser compatibility (HLS)
+    // Xtream Codes servers typically support both interchangeably.
+    if (url.toLowerCase().endsWith('.ts')) {
+      url = url.replace(/\.ts$/i, '.m3u8');
+    }
+
     let drm: StreamOption['drm'] = undefined;
     const headers: Record<string, string> = {};
 
