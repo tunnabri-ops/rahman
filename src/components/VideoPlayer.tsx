@@ -421,6 +421,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
           ref={videoRef}
           controls
           playsInline
+          autoPictureInPicture
           className="w-full h-full object-contain"
         />
 

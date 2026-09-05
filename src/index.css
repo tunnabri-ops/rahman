@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+@theme {
+  /* No custom themes needed for scrollbar, handling via CSS below */
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

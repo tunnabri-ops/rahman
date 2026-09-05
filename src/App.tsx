@@ -342,7 +342,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* Main Player & Stream View */}
-        <main className="flex-1 flex flex-col overflow-y-auto w-full">
+        <main className="flex-1 flex flex-col overflow-y-auto scrollbar-none w-full">
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
               <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
