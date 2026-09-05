@@ -14,7 +14,7 @@ import { Channel } from '../types';
 import { autoParsePlaylist } from '../utils/parser';
 
 export interface PlaylistSource {
-  type: 'repo-m3u' | 'repo-json' | 'custom-url' | 'uploaded-file';
+  type: 'repo-m3u' | 'repo-json' | 'custom-url' | 'uploaded-file' | 'albania-m3u';
   name: string;
   url?: string;
   lastUpdated?: string;
@@ -34,6 +34,8 @@ export const REPO_M3U_URL =
   'https://raw.githubusercontent.com/abukayuum/NINJA-TV/main/playlist.m3u';
 export const REPO_JSON_URL =
   'https://raw.githubusercontent.com/abukayuum/NINJA-TV/main/channels.json';
+export const ALBANIA_M3U_URL =
+  'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlists/playlist_albania.m3u8';
 
 export function PlaylistModal({
   isOpen,
@@ -52,12 +54,12 @@ export function PlaylistModal({
 
   if (!isOpen) return null;
 
-  const handleSelectRepoSource = async (type: 'repo-m3u' | 'repo-json') => {
+  const handleSelectRepoSource = async (type: 'repo-m3u' | 'repo-json' | 'albania-m3u') => {
     setModalError(null);
     setSuccessMessage(null);
     setIsLoadingUrl(true);
     try {
-      const targetUrl = type === 'repo-m3u' ? REPO_M3U_URL : REPO_JSON_URL;
+      const targetUrl = type === 'repo-m3u' ? REPO_M3U_URL : type === 'repo-json' ? REPO_JSON_URL : ALBANIA_M3U_URL;
       const res = await fetch(targetUrl);
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       const text = await res.text();
@@ -66,7 +68,7 @@ export function PlaylistModal({
 
       const newSource: PlaylistSource = {
         type,
-        name: type === 'repo-m3u' ? 'Cloud Master M3U' : 'Cloud Channels (DRM)',
+        name: type === 'repo-m3u' ? 'Cloud Master M3U' : type === 'repo-json' ? 'Cloud Channels (DRM)' : 'Free-TV Albania (Movies/Live)',
         url: targetUrl,
         lastUpdated: new Date().toLocaleTimeString(),
         channelCount: parsed.length,
@@ -240,7 +242,7 @@ export function PlaylistModal({
               <Radio className="w-3.5 h-3.5 text-indigo-400" />
               Primary Live Cloud Streams
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Option 1: Master M3U Playlist */}
               <button
                 onClick={() => handleSelectRepoSource('repo-m3u')}
@@ -296,6 +298,35 @@ export function PlaylistModal({
                 </div>
                 <div className="mt-3 text-xs text-indigo-400 font-medium flex items-center gap-1">
                   {activeSource.type === 'repo-json' ? '✓ Currently Active' : 'Switch & Sync →'}
+                </div>
+              </button>
+
+              {/* Option 3: Albania M3U Playlist */}
+              <button
+                onClick={() => handleSelectRepoSource('albania-m3u')}
+                disabled={isLoadingUrl}
+                className={`p-4 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                  activeSource.type === 'albania-m3u'
+                    ? 'bg-indigo-600/15 border-indigo-500/60 ring-1 ring-indigo-500/50'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-sm text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-indigo-400" />
+                      Free-TV Albania
+                    </span>
+                    <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono">
+                      M3U8
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Loads Albanian IPTV channels & movies from Free-TV master repo.
+                  </p>
+                </div>
+                <div className="mt-3 text-xs text-indigo-400 font-medium flex items-center gap-1">
+                  {activeSource.type === 'albania-m3u' ? '✓ Currently Active' : 'Switch & Sync →'}
                 </div>
               </button>
             </div>
