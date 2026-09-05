@@ -162,7 +162,7 @@ export function ChannelList({
       </div>
 
       {/* Channel Items List */}
-      <div className="p-2 flex-1 overflow-y-auto space-y-1">
+      <div className="p-2 flex-1 overflow-y-auto scrollbar-none space-y-1">
         {filteredChannels.length === 0 ? (
           <div className="text-center py-10 text-slate-500 text-sm flex flex-col items-center gap-2">
             {activeTab === 'favorites' ? (
