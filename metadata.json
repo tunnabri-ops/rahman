@@ -1,6 +1,6 @@
 {
-  "name": "Live IPTV Player",
-  "description": "Watch live IPTV channels in a beautifully designed, responsive web player.",
+  "name": "NRT STREAMING",
+  "description": "Watch live IPTV channels, sports, and events powered by NRT STREAMING.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,70 +1,167 @@
-import { Play } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Play, Search, Radio, X } from 'lucide-react';
 import { Channel } from '../types';
 
 interface ChannelListProps {
   channels: Channel[];
   activeChannel: Channel | null;
   onSelectChannel: (channel: Channel) => void;
+  onOpenPlaylistModal?: () => void;
 }
 
-export function ChannelList({ channels, activeChannel, onSelectChannel }: ChannelListProps) {
-  // Group channels by category
-  const categories = Array.from(new Set(channels.map((c) => c.category)));
+export function ChannelList({
+  channels,
+  activeChannel,
+  onSelectChannel,
+  onOpenPlaylistModal,
+}: ChannelListProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+
+  // Extract unique categories
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    channels.forEach((c) => {
+      if (c.category) set.add(c.category);
+    });
+    return ['All', ...Array.from(set)];
+  }, [channels]);
+
+  // Filter channels based on search and category
+  const filteredChannels = useMemo(() => {
+    return channels.filter((channel) => {
+      const matchesSearch =
+        !searchQuery ||
+        channel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        channel.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesCategory =
+        selectedCategory === 'All' || channel.category === selectedCategory;
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [channels, searchQuery, selectedCategory]);
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-y-auto">
-      <div className="p-4 border-b border-slate-800 sticky top-0 bg-slate-900/95 backdrop-blur z-10">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Play className="w-5 h-5 text-indigo-500" />
-          Live Channels
-        </h2>
+    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-hidden">
+      {/* Top Header */}
+      <div className="p-4 border-b border-slate-800 bg-slate-900/95 backdrop-blur shrink-0 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Radio className="w-5 h-5 text-indigo-500" />
+            Channels
+          </h2>
+          <div className="flex items-center gap-2">
+            {onOpenPlaylistModal && (
+              <button
+                onClick={onOpenPlaylistModal}
+                className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-2 py-1 rounded-md transition-colors font-medium cursor-pointer"
+                title="Manage Playlist and Uploads"
+              >
+                Playlist
+              </button>
+            )}
+            <span className="text-xs bg-slate-800 text-slate-400 font-medium px-2 py-0.5 rounded-full border border-slate-700">
+              {filteredChannels.length}
+            </span>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search channels..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-9 pr-8 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Category Horizontal Scroll Chips */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white font-medium'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="p-2 flex-1">
-        {categories.map((category) => (
-          <div key={category} className="mb-6">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
-              {category}
-            </h3>
-            <div className="space-y-1">
-              {channels
-                .filter((c) => c.category === category)
-                .map((channel) => {
-                  const isActive = activeChannel?.id === channel.id;
-                  return (
-                    <button
-                      key={channel.id}
-                      onClick={() => onSelectChannel(channel)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-left group ${
-                        isActive
-                          ? 'bg-indigo-600 text-white'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center p-1 shrink-0">
-                        {channel.logo ? (
-                          <img
-                            src={channel.logo}
-                            alt={channel.name}
-                            className="max-w-full max-h-full object-contain"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yIDEyaDIwIi8+PC9zdmc+'; // Fallback icon
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-slate-700 rounded" />
-                        )}
-                      </div>
-                      <span className="font-medium truncate">{channel.name}</span>
-                      {isActive && (
-                        <div className="ml-auto w-2 h-2 rounded-full bg-white animate-pulse" />
-                      )}
-                    </button>
-                  );
-                })}
-            </div>
+      {/* Channel Items List */}
+      <div className="p-2 flex-1 overflow-y-auto space-y-1">
+        {filteredChannels.length === 0 ? (
+          <div className="text-center py-10 text-slate-500 text-sm">
+            No channels match your search.
           </div>
-        ))}
+        ) : (
+          filteredChannels.map((channel) => {
+            const isActive = activeChannel?.id === channel.id;
+            return (
+              <button
+                key={channel.id}
+                onClick={() => onSelectChannel(channel)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-left cursor-pointer group ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-md bg-white/10 flex items-center justify-center p-1 shrink-0 overflow-hidden border border-white/5">
+                  {channel.logo ? (
+                    <img
+                      src={channel.logo}
+                      alt={channel.name}
+                      className="max-w-full max-h-full object-contain"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NGEzYjgiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yIDEyaDIwIi8+PC9zdmc+';
+                      }}
+                    />
+                  ) : (
+                    <Play className="w-4 h-4 text-slate-400" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">{channel.name}</div>
+                  <div
+                    className={`text-[11px] truncate ${
+                      isActive ? 'text-indigo-200' : 'text-slate-500'
+                    }`}
+                  >
+                    {channel.category}
+                  </div>
+                </div>
+
+                {isActive && (
+                  <div className="w-2 h-2 rounded-full bg-white shrink-0 animate-pulse" />
+                )}
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );
