@@ -108,6 +108,10 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
     let shakaPlayer: any = null;
     let hlsPlayer: Hls | null = null;
     const video = videoRef.current;
+    
+    if (video) {
+      video.setAttribute('autopictureinpicture', 'true');
+    }
 
     setIsLoading(true);
     setPlaybackError(null);
@@ -504,7 +508,6 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
           ref={videoRef}
           controls
           playsInline
-          autoPictureInPicture
           className="w-full h-full object-contain"
         />
 

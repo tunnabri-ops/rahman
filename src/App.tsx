@@ -10,6 +10,7 @@ import { Channel } from './types';
 import { VideoPlayer } from './components/VideoPlayer';
 import { ChannelList } from './components/ChannelList';
 import { MovieSearch } from './components/MovieSearch';
+import { ClassicMovies } from './components/ClassicMovies';
 import {
   PlaylistModal,
   PlaylistSource,
@@ -68,7 +69,7 @@ export default function App() {
     };
   });
 
-  const [appMode, setAppMode] = useState<'live' | 'movies'>('live');
+  const [appMode, setAppMode] = useState<'live' | 'movies' | 'classic'>('live');
 
   // Security: Block Right Click & DevTools shortcuts
   useEffect(() => {
@@ -300,6 +301,16 @@ export default function App() {
             >
               Movies
             </button>
+            <button
+              onClick={() => setAppMode('classic')}
+              className={`px-3 py-1 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer ${
+                appMode === 'classic' 
+                  ? 'bg-emerald-500/20 text-emerald-300 shadow-sm border border-emerald-500/30' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+              }`}
+            >
+              Classic
+            </button>
           </div>
 
           {/* Live Status Badge */}
@@ -491,9 +502,13 @@ export default function App() {
           )}
         </main>
           </>
-        ) : (
+        ) : appMode === 'movies' ? (
           <main className="flex-1 flex flex-col overflow-hidden w-full relative z-10">
              <MovieSearch />
+          </main>
+        ) : (
+          <main className="flex-1 flex flex-col overflow-hidden w-full relative z-10">
+             <ClassicMovies />
           </main>
         )}
       </div>

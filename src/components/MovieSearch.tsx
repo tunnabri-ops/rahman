@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Film, AlertCircle, Play, ArrowLeft, Star, Calendar, RefreshCw } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 const TMDB_API_KEY = (import.meta as any).env.VITE_TMDB_API_KEY;
 
@@ -104,7 +104,7 @@ export function MovieSearch() {
           <div className="flex items-center gap-3">
              <h2 className="text-lg font-bold text-white truncate max-w-[300px] md:max-w-md">{selectedMovie.title}</h2>
              <span className="hidden sm:inline-flex items-center gap-1 bg-white/[0.05] px-2 py-1 rounded text-xs font-mono text-slate-300 border border-white/[0.05]">
-                {selectedMovie.release_date?.split('-')[0]}
+                {selectedMovie.release_date ? String(selectedMovie.release_date).split('-')[0] : 'N/A'}
              </span>
           </div>
         </div>
@@ -221,7 +221,7 @@ export function MovieSearch() {
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500 font-medium">
                        <span className="flex items-center gap-1">
                          <Calendar className="w-3 h-3 text-slate-600" />
-                         {movie.release_date ? movie.release_date.split('-')[0] : 'N/A'}
+                         {movie.release_date ? String(movie.release_date).split('-')[0] : 'N/A'}
                        </span>
                        <span className="flex items-center gap-1 text-amber-400/80">
                          <Star className="w-3 h-3" />
