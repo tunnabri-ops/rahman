@@ -98,7 +98,56 @@ export function parseM3U(m3uContent: string): Channel[] {
     }
   }
 
+  // Fallback: If no standard #EXTINF headers were found, check for raw stream URLs (m3u8, mp4, mpd, mkv, etc.)
+  if (channels.length === 0) {
+    const rawLines = m3uContent
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'));
+
+    const streamLines = rawLines.filter(
+      (l) => l.startsWith('http://') || l.startsWith('https://') || l.startsWith('//')
+    );
+
+    if (streamLines.length > 0) {
+      streamLines.forEach((streamUrl, index) => {
+        let streamName = `Stream ${index + 1}`;
+        try {
+          const urlObj = new URL(streamUrl.split('$')[0].split('|')[0]);
+          const path = urlObj.pathname;
+          const fileName = path.split('/').pop();
+          if (fileName) {
+            streamName = decodeURIComponent(fileName.split('.')[0] || `Stream ${index + 1}`);
+          }
+        } catch {
+          // Ignore URL parsing error
+        }
+
+        channels.push({
+          id: `direct-${index + 1}`,
+          name: streamName,
+          logo: '',
+          category: 'Direct Streams',
+          url: streamUrl,
+          streams: parseStreamOptions(streamUrl),
+        });
+      });
+    }
+  }
+
   return channels;
+}
+
+export type StreamFormat = 'm3u8' | 'mpd' | 'mp4' | 'mkv' | 'unknown';
+
+export function detectStreamFormat(url: string): StreamFormat {
+  if (!url) return 'unknown';
+  const clean = url.toLowerCase().split('?')[0].split('#')[0];
+  if (clean.endsWith('.mpd') || url.includes('.mpd')) return 'mpd';
+  if (clean.endsWith('.m3u8') || clean.endsWith('.m3u') || url.includes('m3u8')) return 'm3u8';
+  if (clean.endsWith('.mp4') || clean.endsWith('.m4v') || clean.endsWith('.mov') || url.includes('.mp4')) return 'mp4';
+  if (clean.endsWith('.mkv') || clean.endsWith('.webm') || url.includes('.mkv')) return 'mkv';
+  return 'unknown';
 }
 
 /**

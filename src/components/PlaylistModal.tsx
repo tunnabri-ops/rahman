@@ -66,14 +66,14 @@ export function PlaylistModal({
 
       const newSource: PlaylistSource = {
         type,
-        name: type === 'repo-m3u' ? 'Repo M3U Playlist' : 'Repo Channels JSON',
+        name: type === 'repo-m3u' ? 'Cloud Master M3U' : 'Cloud Channels (DRM)',
         url: targetUrl,
         lastUpdated: new Date().toLocaleTimeString(),
         channelCount: parsed.length,
       };
 
       onApplyPlaylist(parsed, newSource);
-      setSuccessMessage(`Updated successfully! Loaded ${parsed.length} channels from repo.`);
+      setSuccessMessage(`Updated successfully! Loaded ${parsed.length} channels.`);
     } catch (err: any) {
       setModalError(`Failed to load playlist: ${err.message || err}`);
     } finally {
@@ -181,13 +181,13 @@ export function PlaylistModal({
             <div>
               <h2 className="text-lg font-bold text-white">Playlist Manager</h2>
               <p className="text-xs text-slate-400">
-                Sync from GitHub repo or upload custom M3U/JSON playlist
+                Sync live cloud streams or upload custom M3U/JSON playlist
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -215,7 +215,7 @@ export function PlaylistModal({
               className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
-              Sync Repo Now
+              Sync Streams Now
             </button>
           </div>
 
@@ -234,14 +234,14 @@ export function PlaylistModal({
             </div>
           )}
 
-          {/* Section 1: Official GitHub Repo Playlist Sources */}
+          {/* Section 1: Official Cloud Stream Playlist Sources */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               <Radio className="w-3.5 h-3.5 text-indigo-400" />
-              GitHub Repository Sources
+              Primary Live Cloud Streams
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Option 1: Repo M3U Playlist */}
+              {/* Option 1: Master M3U Playlist */}
               <button
                 onClick={() => handleSelectRepoSource('repo-m3u')}
                 disabled={isLoadingUrl}
@@ -255,14 +255,14 @@ export function PlaylistModal({
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-sm text-white flex items-center gap-2">
                       <FileText className="w-4 h-4 text-indigo-400" />
-                      playlist.m3u
+                      Live Playlist (M3U)
                     </span>
                     <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono">
-                      M3U / HLS
+                      M3U8
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Loads live IPTV channels directly from the repo's master M3U file.
+                    Loads live IPTV channels directly from the master cloud playlist.
                   </p>
                 </div>
                 <div className="mt-3 text-xs text-indigo-400 font-medium flex items-center gap-1">
@@ -270,7 +270,7 @@ export function PlaylistModal({
                 </div>
               </button>
 
-              {/* Option 2: Repo JSON Channels */}
+              {/* Option 2: Master Channels JSON */}
               <button
                 onClick={() => handleSelectRepoSource('repo-json')}
                 disabled={isLoadingUrl}
@@ -284,14 +284,14 @@ export function PlaylistModal({
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-sm text-white flex items-center gap-2">
                       <Database className="w-4 h-4 text-indigo-400" />
-                      channels.json
+                      DRM Channels (JSON)
                     </span>
                     <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono">
-                      JSON / DRM
+                      ClearKey DRM
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Loads full channel dataset including ClearKey DRM & multi-server configs.
+                    Loads full channel dataset including ClearKey DRM & multi-server stream configs.
                   </p>
                 </div>
                 <div className="mt-3 text-xs text-indigo-400 font-medium flex items-center gap-1">
@@ -321,7 +321,7 @@ export function PlaylistModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".m3u,.m3u8,.json,text/plain"
+                accept=".m3u,.m3u8,.json,.mpd,.mp4,.mkv,text/plain"
                 onChange={handleFileInputChange}
                 className="hidden"
               />
@@ -329,10 +329,10 @@ export function PlaylistModal({
                 <UploadCloud className="w-5 h-5" />
               </div>
               <p className="text-sm font-medium text-slate-200">
-                Click to browse or drag and drop your playlist file here
+                Click to browse or drag and drop your playlist or stream file here
               </p>
               <p className="text-xs text-slate-500 mt-1">
-                Supports .m3u, .m3u8, or .json files
+                Supports .m3u, .m3u8, .json, .mpd, .mp4, and .mkv streams
               </p>
             </div>
           </div>
@@ -341,12 +341,12 @@ export function PlaylistModal({
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-indigo-400" />
-              Load From Custom URL
+              Load From Custom URL / Stream Link
             </h4>
             <div className="flex gap-2">
               <input
                 type="url"
-                placeholder="https://example.com/playlist.m3u"
+                placeholder="https://example.com/stream.m3u8, .mp4, .mpd, or .mkv"
                 value={customUrl}
                 onChange={(e) => setCustomUrl(e.target.value)}
                 className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"

@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Tv, Menu, X, Github, RefreshCw, Layers } from 'lucide-react';
+import { Tv, Menu, X, RefreshCw, Layers, Signal } from 'lucide-react';
 import { Channel } from './types';
 import { VideoPlayer } from './components/VideoPlayer';
 import { ChannelList } from './components/ChannelList';
@@ -31,14 +31,18 @@ export default function App() {
     try {
       const saved = localStorage.getItem(STORAGE_SOURCE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.name && parsed.name.includes('Repo')) {
+          parsed.name = parsed.name.replace(/Repo/g, 'Master');
+        }
+        return parsed;
       }
     } catch {
       // Ignore parse error
     }
     return {
       type: 'repo-m3u',
-      name: 'Repo M3U Playlist',
+      name: 'Master M3U Playlist',
       url: REPO_M3U_URL,
     };
   });
@@ -53,19 +57,19 @@ export default function App() {
     try {
       let targetUrl = source.url || REPO_M3U_URL;
 
-      // Fetch playlist from repo or custom URL
+      // Fetch playlist from cloud source or custom URL
       const response = await fetch(targetUrl);
       if (!response.ok) {
         // Fallback to json if m3u fails or vice versa
         if (targetUrl === REPO_M3U_URL) {
           targetUrl = REPO_JSON_URL;
           const fallbackRes = await fetch(targetUrl);
-          if (!fallbackRes.ok) throw new Error('Failed to fetch playlist from repo');
+          if (!fallbackRes.ok) throw new Error('Failed to fetch playlist streams');
           const data = await fallbackRes.json();
           const parsed = parseChannelsJson(data);
           applyChannels(parsed, {
             type: 'repo-json',
-            name: 'Repo Channels JSON',
+            name: 'Master Channels (DRM)',
             url: REPO_JSON_URL,
             lastUpdated: new Date().toLocaleTimeString(),
             channelCount: parsed.length,
@@ -130,7 +134,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label="Toggle channels menu"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -152,6 +156,13 @@ export default function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Live Status Badge */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300">
+            <Signal className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span className="font-medium text-slate-200">{channels.length}</span>
+            <span className="text-slate-400">Channels</span>
+          </div>
+
           {/* Playlist Manager Button */}
           <button
             onClick={() => setIsPlaylistModalOpen(true)}
@@ -159,7 +170,7 @@ export default function App() {
             title="Manage and update playlist sources"
           >
             <Layers className="w-4 h-4 text-indigo-400" />
-            <span className="hidden sm:inline">Playlist</span>
+            <span>Playlist</span>
             <span className="text-[11px] bg-slate-800 text-indigo-300 px-1.5 py-0.2 rounded font-mono hidden md:inline">
               {activeSource.type === 'repo-m3u'
                 ? 'M3U'
@@ -169,12 +180,12 @@ export default function App() {
             </span>
           </button>
 
-          {/* Sync / Refresh from Repo */}
+          {/* Sync / Refresh Streams */}
           <button
             onClick={handleRefreshRepo}
             disabled={isLoading || isUpdating}
             className="text-xs sm:text-sm font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-            title="Sync & update channels from GitHub repo"
+            title="Sync and reload latest live streams"
           >
             <RefreshCw
               className={`w-4 h-4 text-indigo-400 ${
@@ -183,18 +194,6 @@ export default function App() {
             />
             <span className="hidden sm:inline">Sync</span>
           </button>
-
-          {/* GitHub Repo Link */}
-          <a
-            href="https://github.com/abukayuum/NINJA-TV"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs sm:text-sm font-medium text-slate-400 hover:text-white flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-            title="GitHub Repository"
-          >
-            <Github className="w-4 h-4" />
-            <span className="hidden md:inline">Repo</span>
-          </a>
         </div>
       </header>
 
@@ -233,7 +232,7 @@ export default function App() {
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
               <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-              <p className="text-sm text-slate-400">Loading playlist from {activeSource.name}...</p>
+              <p className="text-sm text-slate-400">Loading playlist streams...</p>
             </div>
           ) : error ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
@@ -268,6 +267,7 @@ export default function App() {
                       <img
                         src={activeChannel.logo}
                         alt={activeChannel.name}
+                        referrerPolicy="no-referrer"
                         className="max-w-full max-h-full object-contain"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
@@ -298,7 +298,7 @@ export default function App() {
                       {activeChannel.name}
                     </h2>
                     <p className="mt-1 text-xs sm:text-sm text-slate-400 leading-relaxed">
-                      Now streaming live on NRT STREAMING • Source: {activeSource.name}
+                      Now streaming live on NRT STREAMING
                     </p>
                   </div>
                 </div>

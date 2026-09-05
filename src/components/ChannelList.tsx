@@ -22,21 +22,22 @@ export function ChannelList({
   const categories = useMemo(() => {
     const set = new Set<string>();
     channels.forEach((c) => {
-      if (c.category) set.add(c.category);
+      const cat = (c.category || '').trim();
+      if (cat) set.add(cat);
     });
     return ['All', ...Array.from(set)];
   }, [channels]);
 
   // Filter channels based on search and category
   const filteredChannels = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
     return channels.filter((channel) => {
-      const matchesSearch =
-        !searchQuery ||
-        channel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        channel.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const name = (channel.name || '').toLowerCase();
+      const cat = (channel.category || '').toLowerCase();
+      const matchesSearch = !query || name.includes(query) || cat.includes(query);
 
       const matchesCategory =
-        selectedCategory === 'All' || channel.category === selectedCategory;
+        selectedCategory === 'All' || (channel.category || '').trim() === selectedCategory;
 
       return matchesSearch && matchesCategory;
     });
@@ -132,6 +133,7 @@ export function ChannelList({
                     <img
                       src={channel.logo}
                       alt={channel.name}
+                      referrerPolicy="no-referrer"
                       className="max-w-full max-h-full object-contain"
                       loading="lazy"
                       onError={(e) => {

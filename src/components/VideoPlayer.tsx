@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import shaka from 'shaka-player';
 import Hls from 'hls.js';
-import { AlertCircle, RefreshCw, Server, AlertTriangle } from 'lucide-react';
+import {
+  AlertCircle,
+  RefreshCw,
+  Server,
+  AlertTriangle,
+  Play,
+  Film,
+} from 'lucide-react';
 import { Channel } from '../types';
+import { detectStreamFormat, StreamFormat } from '../utils/parser';
 
 interface VideoPlayerProps {
   channel: Channel;
@@ -15,6 +23,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [activeEngine, setActiveEngine] = useState<'shaka' | 'hls' | 'native'>('hls');
 
   const streams = channel.streams || [];
   const currentStream = streams[selectedStreamIdx] || null;
@@ -39,12 +48,20 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
       return;
     }
 
-    // Determine if stream needs Shaka Player (DASH .mpd or ClearKey DRM)
-    const isMpd = currentStream.url.includes('.mpd');
+    const streamUrl = currentStream.url;
+    const format: StreamFormat = detectStreamFormat(streamUrl);
     const hasDrm = Boolean(currentStream.drm?.keyId && currentStream.drm?.key);
-    const useShaka = isMpd || hasDrm;
 
-    async function setupShaka() {
+    let triedNative = false;
+    let triedShaka = false;
+    let triedHls = false;
+
+    // 1. Shaka Player Engine (DASH .mpd, ClearKey DRM, or Shaka Fallback)
+    async function playWithShaka() {
+      if (isCancelled || !video) return;
+      triedShaka = true;
+      setActiveEngine('shaka');
+
       try {
         if (shaka.polyfill) {
           shaka.polyfill.installAll();
@@ -52,8 +69,13 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
 
         if (!shaka.Player.isBrowserSupported()) {
           if (!isCancelled) {
-            setPlaybackError('Your browser does not support DRM/DASH playback.');
-            setIsLoading(false);
+            // If Shaka not supported, try native direct
+            if (!triedNative) {
+              playWithNative();
+            } else {
+              setPlaybackError('Your browser does not support DRM / DASH media playback.');
+              setIsLoading(false);
+            }
           }
           return;
         }
@@ -69,8 +91,12 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
             return;
           }
           if (err?.severity === 2) {
-            setIsLoading(false);
-            setPlaybackError('Playback error on this stream. Please switch to another server.');
+            if (!triedNative && (format === 'mp4' || format === 'mkv' || format === 'unknown')) {
+              playWithNative();
+            } else {
+              setIsLoading(false);
+              setPlaybackError('Stream playback error. Please try another server or channel.');
+            }
           }
         });
 
@@ -85,7 +111,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
           });
         }
 
-        // Filter out browser forbidden request headers
+        // Configure headers for restricted streams
         if (currentStream?.headers && Object.keys(currentStream.headers).length > 0) {
           const forbidden = new Set([
             'user-agent',
@@ -105,26 +131,82 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
           });
         }
 
-        await shakaPlayer.load(currentStream.url);
+        await shakaPlayer.load(streamUrl);
 
         if (!isCancelled) {
           setIsLoading(false);
           video.play().catch(() => {
-            // Autoplay may wait for user interaction
+            // Autoplay may need user interaction
           });
         }
       } catch (err: any) {
         if (isCancelled) return;
-        setIsLoading(false);
-        // Ignore expected interruption / cancellation errors during unmount or stream switch
         if (err?.code === 7000 || err?.code === 7001 || err?.code === 7002) {
           return;
         }
-        setPlaybackError('Stream failed to load on this server. Please try another server or channel.');
+        // If Shaka fails on mp4/mkv/direct stream, try native direct playback
+        if (!triedNative && (format === 'mp4' || format === 'mkv' || format === 'unknown')) {
+          playWithNative();
+        } else {
+          setIsLoading(false);
+          setPlaybackError('Failed to load stream with DASH/DRM engine. Try another server.');
+        }
       }
     }
 
-    function setupHls() {
+    // 2. Direct HTML5 Video Engine (MP4, MKV, WebM, progressive streams)
+    function playWithNative() {
+      if (isCancelled || !video) return;
+      triedNative = true;
+      setActiveEngine('native');
+
+      // Clean existing sources
+      if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+      }
+      if (shakaPlayer) {
+        shakaPlayer.destroy().catch(() => {});
+        shakaPlayer = null;
+      }
+
+      video.src = streamUrl;
+      video.load();
+
+      const onCanPlay = () => {
+        if (!isCancelled) {
+          setIsLoading(false);
+          video.play().catch(() => {});
+        }
+      };
+
+      const onError = () => {
+        if (isCancelled) return;
+        // If native failed and format could be DASH/HLS or Shaka might handle it
+        if (!triedShaka && (format === 'mpd' || hasDrm || format === 'unknown')) {
+          playWithShaka();
+        } else if (!triedHls && (format === 'm3u8' || format === 'unknown')) {
+          playWithHls();
+        } else {
+          setIsLoading(false);
+          setPlaybackError(
+            format === 'mkv'
+              ? 'MKV stream codec could not be played by this browser. Please try another server.'
+              : 'Unable to play this video stream. Please try another server.'
+          );
+        }
+      };
+
+      video.addEventListener('canplay', onCanPlay, { once: true });
+      video.addEventListener('error', onError, { once: true });
+    }
+
+    // 3. HLS.js Engine (M3U8 / Live IPTV Streams)
+    function playWithHls() {
+      if (isCancelled || !video) return;
+      triedHls = true;
+      setActiveEngine('hls');
+
       if (Hls.isSupported()) {
         hlsPlayer = new Hls({
           enableWorker: true,
@@ -132,7 +214,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
           backBufferLength: 90,
         });
 
-        hlsPlayer.loadSource(currentStream.url);
+        hlsPlayer.loadSource(streamUrl);
         hlsPlayer.attachMedia(video);
 
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -145,23 +227,46 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         hlsPlayer.on(Hls.Events.ERROR, (_event, data) => {
           if (isCancelled) return;
           if (data.fatal) {
-            setIsLoading(false);
+            // If manifest parsing error occurred, stream might actually be progressive MP4 or MKV!
+            if (
+              (data.details === Hls.ErrorDetails.MANIFEST_PARSING_ERROR ||
+                data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR) &&
+              !triedNative
+            ) {
+              if (hlsPlayer) {
+                hlsPlayer.destroy();
+                hlsPlayer = null;
+              }
+              playWithNative();
+              return;
+            }
+
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                setPlaybackError('Network connection failed. Please try another server.');
+                setIsLoading(false);
+                setPlaybackError('Network connection failed on this stream. Try another server.');
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
                 hlsPlayer?.recoverMediaError();
                 break;
               default:
-                setPlaybackError('Unable to play this stream. Please try another server.');
+                if (!triedShaka) {
+                  if (hlsPlayer) {
+                    hlsPlayer.destroy();
+                    hlsPlayer = null;
+                  }
+                  playWithShaka();
+                } else {
+                  setIsLoading(false);
+                  setPlaybackError('Unable to play this stream. Please switch to another server.');
+                }
                 break;
             }
           }
         });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari native HLS playback
-        video.src = currentStream.url;
+        // Native Apple Safari HLS
+        video.src = streamUrl;
         const onLoaded = () => {
           if (!isCancelled) {
             setIsLoading(false);
@@ -170,28 +275,33 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         };
         const onError = () => {
           if (!isCancelled) {
-            setIsLoading(false);
-            setPlaybackError('Unable to load stream on Safari.');
+            if (!triedNative) {
+              playWithNative();
+            } else {
+              setIsLoading(false);
+              setPlaybackError('Unable to load stream.');
+            }
           }
         };
 
-        video.addEventListener('loadedmetadata', onLoaded);
-        video.addEventListener('error', onError);
-
-        return () => {
-          video.removeEventListener('loadedmetadata', onLoaded);
-          video.removeEventListener('error', onError);
-        };
+        video.addEventListener('loadedmetadata', onLoaded, { once: true });
+        video.addEventListener('error', onError, { once: true });
       } else {
-        video.src = currentStream.url;
-        setIsLoading(false);
+        // Fallback to direct native
+        playWithNative();
       }
     }
 
-    if (useShaka) {
-      setupShaka();
+    // Engine Selection Routing based on format & DRM
+    if (format === 'mpd' || hasDrm) {
+      playWithShaka();
+    } else if (format === 'mp4' || format === 'mkv') {
+      playWithNative();
+    } else if (format === 'm3u8') {
+      playWithHls();
     } else {
-      setupHls();
+      // Default: try HLS first (standard for IPTV), auto-falls back to native/shaka on error
+      playWithHls();
     }
 
     return () => {
@@ -205,6 +315,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         hlsPlayer = null;
       }
       if (video) {
+        video.pause();
         video.removeAttribute('src');
         video.load();
       }
@@ -219,6 +330,16 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
 
   const handleRetry = () => {
     setRetryCount((c) => c + 1);
+  };
+
+  const getFormatBadge = (streamUrl: string, hasDrmFlag: boolean) => {
+    const fmt = detectStreamFormat(streamUrl);
+    if (hasDrmFlag) return 'DRM • MPD';
+    if (fmt === 'mpd') return 'DASH';
+    if (fmt === 'm3u8') return 'HLS (M3U8)';
+    if (fmt === 'mp4') return 'MP4';
+    if (fmt === 'mkv') return 'MKV';
+    return 'STREAM';
   };
 
   if (streams.length === 0) {
@@ -246,6 +367,9 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
             <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
             <span className="text-sm font-medium text-slate-300">
               Connecting to {currentStream?.name || 'stream'}...
+            </span>
+            <span className="text-[11px] font-mono text-slate-400">
+              Engine: {activeEngine.toUpperCase()} • Format: {currentStream?.url ? detectStreamFormat(currentStream.url).toUpperCase() : 'AUTO'}
             </span>
           </div>
         )}
@@ -281,6 +405,23 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         )}
       </div>
 
+      {/* Format & Player Info Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-400">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded font-mono text-[11px] text-slate-300">
+            <Film className="w-3 h-3 text-indigo-400" />
+            Format: {currentStream ? getFormatBadge(currentStream.url, Boolean(currentStream.drm)) : 'AUTO'}
+          </span>
+          <span className="inline-flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded font-mono text-[11px] text-slate-300">
+            <Play className="w-3 h-3 text-emerald-400" />
+            Engine: {activeEngine.toUpperCase()}
+          </span>
+        </div>
+        <div className="text-[11px] text-slate-500">
+          Supports: M3U8 • MP4 • MPD (DASH) • MKV
+        </div>
+      </div>
+
       {/* Mixed Content Notice if HTTP stream on HTTPS website */}
       {isMixedContent && (
         <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-xs leading-relaxed">
@@ -305,11 +446,12 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
           <div className="flex flex-wrap gap-2">
             {streams.map((stream, idx) => {
               const isSelected = selectedStreamIdx === idx;
+              const formatLabel = getFormatBadge(stream.url, Boolean(stream.drm));
               return (
                 <button
                   key={idx}
                   onClick={() => setSelectedStreamIdx(idx)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-150 flex items-center gap-2 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-150 flex items-center gap-2 cursor-pointer ${
                     isSelected
                       ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20'
                       : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/50'
@@ -321,11 +463,15 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
                     }`}
                   />
                   <span>{stream.name || `Server ${idx + 1}`}</span>
-                  {stream.drm && (
-                    <span className="text-[10px] bg-slate-950/40 px-1.5 py-0.5 rounded text-indigo-200">
-                      DRM
-                    </span>
-                  )}
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                      isSelected
+                        ? 'bg-indigo-950/60 text-indigo-200'
+                        : 'bg-slate-900 text-slate-400'
+                    }`}
+                  >
+                    {formatLabel}
+                  </span>
                 </button>
               );
             })}
