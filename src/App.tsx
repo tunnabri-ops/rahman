@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { Tv, Menu, X, RefreshCw, Layers, Signal } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Channel } from './types';
 import { VideoPlayer } from './components/VideoPlayer';
 import { ChannelList } from './components/ChannelList';
@@ -17,6 +18,8 @@ import {
 import { autoParsePlaylist, parseChannelsJson } from './utils/parser';
 
 const STORAGE_SOURCE_KEY = 'nrt_streaming_source';
+const STORAGE_FAVS_KEY = 'nrt_favorites';
+const STORAGE_RECENT_KEY = 'nrt_recent';
 
 export default function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -26,6 +29,23 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Favorites & Recents State
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_FAVS_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const [recentChannels, setRecentChannels] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_RECENT_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   const [activeSource, setActiveSource] = useState<PlaylistSource>(() => {
     try {
@@ -46,6 +66,78 @@ export default function App() {
       url: REPO_M3U_URL,
     };
   });
+
+  // Security: Block Right Click & DevTools shortcuts
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block F12
+      if (e.key === 'F12') {
+        e.preventDefault();
+      }
+      // Block Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+      if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j')) {
+        e.preventDefault();
+      }
+      if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Monkey-patch console to hide output from average users
+    const noop = () => {};
+    const originalConsoleLog = console.log;
+    const originalConsoleInfo = console.info;
+    const originalConsoleWarn = console.warn;
+    console.log = noop;
+    console.info = noop;
+    
+    // Only warn stays for critical errors handling logic internally if needed, but we can mock it too
+    // We will keep warn active so React/Video player internal errors don't crash the stack silently
+    
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      console.log = originalConsoleLog;
+      console.info = originalConsoleInfo;
+    };
+  }, []);
+
+  // Persist Favorites & Recents
+  useEffect(() => {
+    localStorage.setItem(STORAGE_FAVS_KEY, JSON.stringify(favorites));
+  }, [favorites]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_RECENT_KEY, JSON.stringify(recentChannels));
+  }, [recentChannels]);
+
+  // Handle Channel Selection
+  const handleSelectChannel = (channel: Channel) => {
+    setActiveChannel(channel);
+    setIsMobileMenuOpen(false);
+    
+    // Add to recents (keep last 15)
+    setRecentChannels(prev => {
+      const newRecents = [channel.id, ...prev.filter(id => id !== channel.id)].slice(0, 15);
+      return newRecents;
+    });
+  };
+
+  const toggleFavorite = (channelId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFavorites(prev => 
+      prev.includes(channelId) 
+        ? prev.filter(id => id !== channelId)
+        : [...prev, channelId]
+    );
+  };
 
   useEffect(() => {
     loadActivePlaylist(activeSource);
@@ -109,7 +201,15 @@ export default function App() {
     }
     if (newChannels.length > 0) {
       setActiveChannel((prev) => {
-        if (!prev) return newChannels[0];
+        if (!prev) {
+           // Try to select first recent channel if it exists in the new list
+           const lastRecentId = recentChannels[0];
+           if (lastRecentId) {
+             const recentMatch = newChannels.find((c) => c.id === lastRecentId);
+             if (recentMatch) return recentMatch;
+           }
+           return newChannels[0];
+        }
         const match = newChannels.find((c) => c.name === prev.name);
         return match || newChannels[0];
       });
@@ -140,9 +240,14 @@ export default function App() {
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center gap-2.5">
-            <div className="bg-indigo-600 p-1.5 rounded-lg shadow-sm shadow-indigo-600/30">
+            <motion.div 
+              initial={{ scale: 0.8, rotate: -10 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 300 }}
+              className="bg-indigo-600 p-1.5 rounded-lg shadow-sm shadow-indigo-600/30"
+            >
               <Tv className="w-5 h-5 text-white" />
-            </div>
+            </motion.div>
             <div className="flex flex-col">
               <h1 className="text-base sm:text-lg font-bold tracking-wider text-white flex items-center gap-2">
                 NRT STREAMING
@@ -157,11 +262,15 @@ export default function App() {
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Live Status Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300"
+          >
             <Signal className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             <span className="font-medium text-slate-200">{channels.length}</span>
             <span className="text-slate-400">Channels</span>
-          </div>
+          </motion.div>
 
           {/* Playlist Manager Button */}
           <button
@@ -208,10 +317,10 @@ export default function App() {
           <ChannelList
             channels={channels}
             activeChannel={activeChannel}
-            onSelectChannel={(channel) => {
-              setActiveChannel(channel);
-              setIsMobileMenuOpen(false);
-            }}
+            onSelectChannel={handleSelectChannel}
+            favorites={favorites}
+            recentChannels={recentChannels}
+            onToggleFavorite={toggleFavorite}
             onOpenPlaylistModal={() => {
               setIsPlaylistModalOpen(true);
               setIsMobileMenuOpen(false);
@@ -220,12 +329,17 @@ export default function App() {
         </aside>
 
         {/* Mobile Sidebar Overlay Backdrop */}
-        {isMobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/60 z-20 lg:hidden backdrop-blur-xs transition-opacity"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-        )}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-20 lg:hidden backdrop-blur-xs"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Main Player & Stream View */}
         <main className="flex-1 flex flex-col overflow-y-auto w-full">
@@ -253,10 +367,16 @@ export default function App() {
               </div>
             </div>
           ) : activeChannel ? (
-            <div className="w-full max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 space-y-5">
+            <motion.div 
+              key={activeChannel.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 space-y-5"
+            >
               {/* Responsive Video Player */}
               <div className="w-full relative">
-                <VideoPlayer key={activeChannel.id} channel={activeChannel} />
+                <VideoPlayer channel={activeChannel} />
               </div>
 
               {/* Now Playing Channel Card */}
@@ -303,7 +423,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2 p-6">
               <Tv className="w-10 h-10 text-slate-600 mb-2" />
