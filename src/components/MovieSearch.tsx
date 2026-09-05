@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Film, AlertCircle, Play, ArrowLeft, Star, Calendar, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const TMDB_API_KEY = (import.meta as any).env.VITE_TMDB_API_KEY;
+const TMDB_API_KEY = (import.meta as any).env.VITE_TMDB_API_KEY || "517f761cd42a9b40735f440541db40d4";
 
 interface Movie {
   id: number;
