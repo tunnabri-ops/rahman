@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Tv, Menu, X, RefreshCw, Layers, Signal } from 'lucide-react';
+import { Tv, Menu, X, RefreshCw, Layers, Signal, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Channel } from './types';
 import { VideoPlayer } from './components/VideoPlayer';
@@ -29,6 +29,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isBotBlocked, setIsBotBlocked] = useState(false);
 
   // Favorites & Recents State
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -67,8 +68,36 @@ export default function App() {
     };
   });
 
-  // Security: Block Right Click & DevTools shortcuts
+  // Security: Block Right Click & DevTools shortcuts & Basic Bot Rate Limiter
   useEffect(() => {
+    // 1. Basic Rate Limiting / Bot Detection (Click spamming)
+    let clickCount = 0;
+    let lastClickTime = Date.now();
+    
+    const handleClick = () => {
+      const now = Date.now();
+      if (now - lastClickTime < 300) {
+        clickCount++;
+      } else {
+        clickCount = 1;
+      }
+      lastClickTime = now;
+
+      // If more than 15 rapid clicks happen within a short span, block the app
+      if (clickCount > 15) {
+        setIsBotBlocked(true);
+        // Save to session storage so they can't bypass easily without restarting
+        sessionStorage.setItem('bot_flag', 'true');
+      }
+    };
+
+    if (sessionStorage.getItem('bot_flag') === 'true') {
+      setIsBotBlocked(true);
+    }
+
+    document.addEventListener('click', handleClick);
+
+    // 2. DevTools Blocking
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
     };
@@ -102,6 +131,7 @@ export default function App() {
     // We will keep warn active so React/Video player internal errors don't crash the stack silently
     
     return () => {
+      document.removeEventListener('click', handleClick);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
       console.log = originalConsoleLog;
@@ -226,6 +256,18 @@ export default function App() {
       setIsUpdating(false);
     }
   };
+
+  if (isBotBlocked) {
+    return (
+      <div className="min-h-screen bg-[#060609] text-red-500 flex flex-col items-center justify-center font-sans p-6 text-center">
+        <AlertCircle className="w-16 h-16 mb-4 text-red-500 animate-pulse" />
+        <h1 className="text-3xl font-bold text-white mb-2">Access Denied</h1>
+        <p className="text-slate-400 max-w-md">
+          Unusual activity detected. Access has been temporarily blocked for security reasons.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#060609] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] text-slate-200 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
