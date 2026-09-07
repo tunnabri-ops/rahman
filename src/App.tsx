@@ -9,8 +9,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Channel } from './types';
 import { VideoPlayer } from './components/VideoPlayer';
 import { ChannelList } from './components/ChannelList';
-import { MovieSearch } from './components/MovieSearch';
-import { ClassicMovies } from './components/ClassicMovies';
 import {
   PlaylistModal,
   PlaylistSource,
@@ -68,8 +66,6 @@ export default function App() {
       url: REPO_M3U_URL,
     };
   });
-
-  const [appMode, setAppMode] = useState<'live' | 'movies' | 'classic'>('live');
 
   // Security: Block Right Click & DevTools shortcuts
   useEffect(() => {
@@ -279,40 +275,6 @@ export default function App() {
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-4">
           
-          {/* Mode Switcher */}
-          <div className="flex bg-black/40 p-1 rounded-xl border border-white/[0.05] shadow-inner">
-            <button
-              onClick={() => setAppMode('live')}
-              className={`px-3 py-1 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer ${
-                appMode === 'live' 
-                  ? 'bg-white/10 text-white shadow-sm' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
-              }`}
-            >
-              Live TV
-            </button>
-            <button
-              onClick={() => setAppMode('movies')}
-              className={`px-3 py-1 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer ${
-                appMode === 'movies' 
-                  ? 'bg-indigo-500/20 text-indigo-300 shadow-sm border border-indigo-500/30' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
-              }`}
-            >
-              Movies
-            </button>
-            <button
-              onClick={() => setAppMode('classic')}
-              className={`px-3 py-1 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer ${
-                appMode === 'classic' 
-                  ? 'bg-emerald-500/20 text-emerald-300 shadow-sm border border-emerald-500/30' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
-              }`}
-            >
-              Classic
-            </button>
-          </div>
-
           {/* Live Status Badge */}
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
@@ -343,9 +305,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
-        {appMode === 'live' ? (
-          <>
-            {/* Sidebar Channel List (Desktop & Mobile Drawer) */}
+        {/* Sidebar Channel List (Desktop & Mobile Drawer) */}
         <aside
           className={`absolute inset-y-0 left-0 z-30 w-72 sm:w-80 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
             isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -501,16 +461,6 @@ export default function App() {
             </div>
           )}
         </main>
-          </>
-        ) : appMode === 'movies' ? (
-          <main className="flex-1 flex flex-col overflow-hidden w-full relative z-10">
-             <MovieSearch />
-          </main>
-        ) : (
-          <main className="flex-1 flex flex-col overflow-hidden w-full relative z-10">
-             <ClassicMovies />
-          </main>
-        )}
       </div>
 
       {/* Playlist Manager Modal */}
