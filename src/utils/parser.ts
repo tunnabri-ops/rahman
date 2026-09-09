@@ -27,7 +27,13 @@ export function parseStreamOptions(rawUrl: string): StreamOption[] {
     const parts = streamPart.split('|');
     let url = parts[0].trim();
     
-    // We removed the auto-convert .ts to .m3u8, because we now support .ts directly using mpegts.js
+    // Auto-convert .ts URLs to .m3u8 for web browser compatibility (HLS).
+    // Xtream Codes (IPTV) servers stream much more stably via HLS (.m3u8) 
+    // rather than progressive HTTP download (.ts) which causes browser MSE memory crashes.
+    if (url.toLowerCase().includes('.ts')) {
+       // Replace .ts with .m3u8 (handling query params if they exist)
+       url = url.replace(/\.ts(\?|$)/i, '.m3u8$1');
+    }
 
     let drm: StreamOption['drm'] = undefined;
     const headers: Record<string, string> = {};

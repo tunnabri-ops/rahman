@@ -12,7 +12,7 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
-  Settings,
+  Settings, Activity, Cast,
   ChevronDown
 } from 'lucide-react';
 import { Channel } from '../types';
@@ -41,6 +41,17 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  
+  // Audio Normalizer state & refs
+  const [normalizerEnabled, setNormalizerEnabled] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const audioInitializedRef = useRef(false);
+
+  // Chromecast State
+  const [isCastAvailable, setIsCastAvailable] = useState(false);
+  const [castSession, setCastSession] = useState<any>(null);
 
   const streams = channel.streams || [];
   const currentStream = streams[selectedStreamIdx] || null;
@@ -116,6 +127,158 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
       }
     };
   }, []);
+
+  // Initialize Chromecast SDK
+  useEffect(() => {
+    let checkInterval: NodeJS.Timeout;
+    
+    // We attach a listener to window for Cast API
+    (window as any).__onGCastApiAvailable = (isAvailable: boolean) => {
+      if (isAvailable && (window as any).cast && (window as any).chrome) {
+        const castContext = (window as any).cast.framework.CastContext.getInstance();
+        try {
+          castContext.setOptions({
+            receiverApplicationId: (window as any).chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+            autoJoinPolicy: (window as any).chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+          });
+          setIsCastAvailable(true);
+
+          castContext.addEventListener(
+            (window as any).cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+            (event: any) => {
+              if (event.sessionState === (window as any).cast.framework.SessionState.SESSION_STARTED || 
+                  event.sessionState === (window as any).cast.framework.SessionState.SESSION_RESUMED) {
+                setCastSession(event.session);
+              } else if (event.sessionState === (window as any).cast.framework.SessionState.SESSION_ENDED) {
+                setCastSession(null);
+              }
+            }
+          );
+        } catch (e) {
+          console.warn("Cast setup error:", e);
+        }
+      }
+    };
+
+    // Fallback polling if the callback missed it
+    checkInterval = setInterval(() => {
+      if ((window as any).cast && (window as any).chrome && !isCastAvailable) {
+        (window as any).__onGCastApiAvailable(true);
+        clearInterval(checkInterval);
+      }
+    }, 1000);
+
+    return () => clearInterval(checkInterval);
+  }, [isCastAvailable]);
+
+  const loadMediaToCast = (session: any) => {
+    if (!currentStream) return;
+    try {
+      const mediaInfo = new (window as any).chrome.cast.media.MediaInfo(currentStream.url, 'video/mp4');
+      mediaInfo.metadata = new (window as any).chrome.cast.media.GenericMediaMetadata();
+      mediaInfo.metadata.title = channel.name || 'Live Channel';
+      if (channel.logo) {
+         mediaInfo.metadata.images = [{url: channel.logo}];
+      }
+      const request = new (window as any).chrome.cast.media.LoadRequest(mediaInfo);
+      session.loadMedia(request).then(
+        () => {
+          console.log('Casting succeeded');
+          if (videoRef.current) videoRef.current.pause(); // Pause local player
+        },
+        (error: any) => console.log('Casting failed', error)
+      );
+    } catch (e) {
+      console.warn("Cast load error:", e);
+    }
+  };
+
+  const handleCast = () => {
+    if (!(window as any).cast) return;
+    const context = (window as any).cast.framework.CastContext.getInstance();
+    
+    if (castSession) {
+       // Prompt to stop casting or load current media
+       loadMediaToCast(castSession);
+    } else {
+       context.requestSession().then(
+         (session: any) => {
+           setCastSession(session);
+           loadMediaToCast(session);
+         },
+         (error: any) => console.log('Cast error', error)
+       );
+    }
+  };
+
+  // Initialize and handle Audio Normalizer (Dynamic Range Compression)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (!audioInitializedRef.current) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        try {
+          const ctx = new AudioContextClass();
+          audioCtxRef.current = ctx;
+
+          const source = ctx.createMediaElementSource(video);
+          mediaSourceRef.current = source;
+
+          const compressor = ctx.createDynamicsCompressor();
+          // Configure compressor for aggressive TV/broadcast leveling
+          compressor.threshold.value = -24; // Compress anything above -24dB
+          compressor.knee.value = 12; // Soft transition
+          compressor.ratio.value = 8; // Heavy compression ratio
+          compressor.attack.value = 0.005; // Fast attack
+          compressor.release.value = 0.1; // Fast release
+          compressorRef.current = compressor;
+          
+          audioInitializedRef.current = true;
+        } catch (e) {
+          console.warn('AudioContext setup failed (normalizer unavailable):', e);
+        }
+      }
+    }
+
+    const ctx = audioCtxRef.current;
+    const source = mediaSourceRef.current;
+    const compressor = compressorRef.current;
+
+    if (ctx && source && compressor) {
+      try {
+        source.disconnect();
+        compressor.disconnect();
+
+        if (normalizerEnabled) {
+          source.connect(compressor);
+          compressor.connect(ctx.destination);
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+        } else {
+          source.connect(ctx.destination);
+        }
+      } catch (e) {
+        console.warn('Failed to route audio normalizer:', e);
+      }
+    }
+  }, [normalizerEnabled]);
+
+  // Handle auto-resume of audio context on video play (browser policy)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const handlePlay = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state === 'suspended' && normalizerEnabled) {
+        ctx.resume().catch(() => {});
+      }
+    };
+    video.addEventListener('play', handlePlay);
+    return () => video.removeEventListener('play', handlePlay);
+  }, [normalizerEnabled]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -811,6 +974,28 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
                />
              </div>
            </div>
+
+           {/* Cast Button */}
+           {isCastAvailable && (
+             <button
+               onClick={handleCast}
+               title={castSession ? "Casting to TV" : "Cast to TV"}
+               className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm ${castSession ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-white/[0.05] text-slate-300 hover:text-white hover:bg-white/10 border border-white/[0.05]'}`}
+             >
+               <Cast className={`w-3.5 h-3.5 ${castSession ? 'animate-pulse' : ''}`} />
+               <span className="hidden sm:inline">Cast</span>
+             </button>
+           )}
+
+           {/* Audio Normalizer Toggle */}
+           <button
+             onClick={() => setNormalizerEnabled(!normalizerEnabled)}
+             title={normalizerEnabled ? "Disable Audio Normalizer" : "Enable Audio Normalizer"}
+             className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm ${normalizerEnabled ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30' : 'bg-white/[0.05] text-slate-300 hover:text-white hover:bg-white/10 border border-white/[0.05]'}`}
+           >
+             <Activity className={`w-3.5 h-3.5 ${normalizerEnabled ? 'animate-pulse' : ''}`} />
+             <span className="hidden sm:inline">Normalizer</span>
+           </button>
 
            {/* Quality Selector */}
            {qualities.length > 0 && (
