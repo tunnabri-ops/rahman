@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import shaka from 'shaka-player';
 import Hls from 'hls.js';
+import mpegts from 'mpegts.js';
 import {
   AlertCircle,
   RefreshCw,
@@ -29,7 +30,7 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [activeEngine, setActiveEngine] = useState<'shaka' | 'hls' | 'native'>('hls');
+  const [activeEngine, setActiveEngine] = useState<'shaka' | 'hls' | 'native' | 'mpegts'>('hls');
   const [autoPlayTimer, setAutoPlayTimer] = useState<number | null>(null);
 
   const shakaRef = useRef<any>(null);
@@ -120,6 +121,7 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
     let isCancelled = false;
     let shakaPlayer: any = null;
     let hlsPlayer: Hls | null = null;
+    let mpegtsPlayer: any = null;
     const video = videoRef.current;
     
     if (video) {
@@ -416,7 +418,112 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
     }
 
     // Engine Selection Routing based on format & DRM
-    if (format === 'mpd' || hasDrm) {
+    
+    function playWithMpegTs() {
+      if (isCancelled || !video) return;
+      setActiveEngine('mpegts');
+
+      // Clean existing sources
+      if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+      }
+      if (shakaPlayer) {
+        shakaPlayer.destroy().catch(() => {});
+        shakaPlayer = null;
+      }
+      if (mpegtsPlayer) {
+        mpegtsPlayer.destroy();
+        mpegtsPlayer = null;
+      }
+
+      if (mpegts.isSupported()) {
+        mpegtsPlayer = mpegts.createPlayer({
+          type: 'mpegts',
+          isLive: true,
+          url: streamUrl,
+        }, {
+          enableWorker: true,
+          lazyLoad: false,
+          enableStashBuffer: false,
+          autoCleanupSourceBuffer: true,
+          fixAudioTimestampGap: true,
+          liveBufferLatencyChasing: true,
+          liveBufferLatencyMaxLatency: 3,
+          liveBufferLatencyMinRemain: 0.3
+        });
+        
+        mpegtsPlayer.attachMediaElement(video);
+        mpegtsPlayer.load();
+        
+        mpegtsPlayer.on(mpegts.Events.ERROR, (errorType: any, errorDetail: any, errorInfo: any) => {
+          if (isCancelled) return;
+          console.warn("Mpegts Error:", errorType, errorDetail, errorInfo);
+          
+          // Auto-reconnect on network or media errors for live TS streams
+          if (errorType === mpegts.ErrorTypes.NETWORK_ERROR || errorType === mpegts.ErrorTypes.MEDIA_ERROR) {
+            console.log("Attempting to reconnect TS stream...");
+            setTimeout(() => {
+              if (!isCancelled) playWithMpegTs();
+            }, 2000);
+          } else {
+            handleUltimateFailure('Failed to play .ts stream.');
+          }
+        });
+
+        // Specific fix for TS stream stalling in MSE (video freezes but no error is thrown)
+        let lastTime = -1;
+        let stallCount = 0;
+        let stallCheckInterval = setInterval(() => {
+          if (isCancelled || !video || video.paused) {
+             lastTime = -1;
+             stallCount = 0;
+             return;
+          }
+          
+          if (video.currentTime === lastTime) {
+             stallCount++;
+             if (stallCount >= 3) { // Stalled for ~3-4 seconds
+                console.log("TS stream stalled (frozen frame), forcing reconnect...");
+                clearInterval(stallCheckInterval);
+                playWithMpegTs();
+             }
+          } else {
+             stallCount = 0;
+          }
+          lastTime = video.currentTime;
+          
+          // Fallback buffer size check
+          const currentBuffer = video.buffered.length > 0 ? video.buffered.end(video.buffered.length - 1) : 0;
+          if (currentBuffer - video.currentTime > 30) {
+             console.log("Buffer too large, reconnecting TS stream to prevent stall...");
+             clearInterval(stallCheckInterval);
+             playWithMpegTs();
+          }
+        }, 1500);
+        
+        // Clean up interval when cancelled
+        const originalCancel = isCancelled;
+        setInterval(() => {
+          if (isCancelled !== originalCancel) {
+             clearInterval(stallCheckInterval);
+          }
+        }, 1000);
+
+        mpegtsPlayer.play().then(() => {
+          if (!isCancelled) setIsLoading(false);
+        }).catch(() => {
+          if (!isCancelled) setIsLoading(false); // Autoplay blocked usually
+        });
+      } else {
+        // Fallback to native if not supported
+        playWithNative();
+      }
+    }
+
+    if (format === 'ts') {
+      playWithMpegTs();
+    } else if (format === 'mpd' || hasDrm) {
       playWithShaka();
     } else if (format === 'mp4' || format === 'mkv') {
       playWithNative();
@@ -436,6 +543,10 @@ export function VideoPlayer({ channel, onPlayNextChannel }: VideoPlayerProps) {
       if (hlsPlayer) {
         hlsPlayer.destroy();
         hlsPlayer = null;
+      }
+      if (mpegtsPlayer) {
+        mpegtsPlayer.destroy();
+        mpegtsPlayer = null;
       }
       if (video) {
         video.pause();

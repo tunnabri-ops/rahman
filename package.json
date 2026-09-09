@@ -19,6 +19,7 @@
     "hls.js": "^1.7.2",
     "lucide-react": "^0.546.0",
     "motion": "^13.2.0",
+    "mpegts.js": "^1.8.2",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "shaka-player": "^5.2.9",

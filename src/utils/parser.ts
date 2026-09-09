@@ -27,11 +27,7 @@ export function parseStreamOptions(rawUrl: string): StreamOption[] {
     const parts = streamPart.split('|');
     let url = parts[0].trim();
     
-    // Auto-convert .ts URLs to .m3u8 for web browser compatibility (HLS)
-    // Xtream Codes servers typically support both interchangeably.
-    if (url.toLowerCase().endsWith('.ts')) {
-      url = url.replace(/\.ts$/i, '.m3u8');
-    }
+    // We removed the auto-convert .ts to .m3u8, because we now support .ts directly using mpegts.js
 
     let drm: StreamOption['drm'] = undefined;
     const headers: Record<string, string> = {};
@@ -145,7 +141,7 @@ export function parseM3U(m3uContent: string): Channel[] {
   return channels;
 }
 
-export type StreamFormat = 'm3u8' | 'mpd' | 'mp4' | 'mkv' | 'unknown';
+export type StreamFormat = 'm3u8' | 'mpd' | 'mp4' | 'mkv' | 'ts' | 'unknown';
 
 export function detectStreamFormat(url: string): StreamFormat {
   if (!url) return 'unknown';
@@ -154,6 +150,7 @@ export function detectStreamFormat(url: string): StreamFormat {
   if (clean.endsWith('.m3u8') || clean.endsWith('.m3u') || url.includes('m3u8')) return 'm3u8';
   if (clean.endsWith('.mp4') || clean.endsWith('.m4v') || clean.endsWith('.mov') || url.includes('.mp4')) return 'mp4';
   if (clean.endsWith('.mkv') || clean.endsWith('.webm') || url.includes('.mkv')) return 'mkv';
+  if (clean.endsWith('.ts') || url.includes('.ts')) return 'ts';
   return 'unknown';
 }
 
