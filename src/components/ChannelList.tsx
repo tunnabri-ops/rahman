@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Play, Search, Radio, X, Heart, Clock, ListVideo } from 'lucide-react';
+import { Play, Search, Radio, X, Heart, Clock, ListVideo, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Channel } from '../types';
+import { getCurrentProgram } from '../utils/epgParser';
 
 interface ChannelListProps {
   channels: Channel[];
@@ -175,6 +176,7 @@ export function ChannelList({
           filteredChannels.map((channel, i) => {
             const isActive = activeChannel?.id === channel.id;
             const isFav = favorites.includes(channel.id);
+            const currentProgram = getCurrentProgram(channel.epg);
             return (
               <motion.button
                 initial={{ opacity: 0, x: -10 }}
@@ -211,11 +213,20 @@ export function ChannelList({
                 <div className="flex-1 min-w-0">
                   <div className={`font-semibold text-sm truncate transition-colors ${isActive ? 'text-indigo-100' : 'text-slate-200 group-hover:text-white'}`}>{channel.name}</div>
                   <div
-                    className={`text-[11px] font-medium truncate transition-colors mt-0.5 ${
+                    className={`flex items-center gap-1.5 text-[11px] font-medium truncate transition-colors mt-0.5 ${
                       isActive ? 'text-indigo-300/80' : 'text-slate-500 group-hover:text-slate-400'
                     }`}
                   >
-                    {channel.category || 'Uncategorized'}
+                    <span>{channel.category || 'Uncategorized'}</span>
+                    {currentProgram && (
+                      <>
+                        <span className="opacity-50">•</span>
+                        <span className="flex items-center gap-1 opacity-90 text-indigo-400">
+                          <Calendar className="w-3 h-3" />
+                          <span className="truncate max-w-[120px] sm:max-w-[150px]">{currentProgram.title}</span>
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 

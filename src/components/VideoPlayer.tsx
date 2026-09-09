@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import shaka from 'shaka-player';
 import Hls from 'hls.js';
 import mpegts from 'mpegts.js';

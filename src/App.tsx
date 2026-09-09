@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Tv, Menu, X, RefreshCw, Layers, Signal, AlertCircle } from 'lucide-react';
+import { Tv, Menu, X, RefreshCw, Layers, Signal, AlertCircle, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Channel } from './types';
 import { VideoPlayer } from './components/VideoPlayer';
@@ -16,10 +16,12 @@ import {
   REPO_JSON_URL,
 } from './components/PlaylistModal';
 import { autoParsePlaylist, parseChannelsJson } from './utils/parser';
+import { fetchAndParseEPG, getCurrentProgram } from './utils/epgParser';
 
 const STORAGE_SOURCE_KEY = 'nrt_streaming_source';
 const STORAGE_FAVS_KEY = 'nrt_favorites';
 const STORAGE_RECENT_KEY = 'nrt_recent';
+const STORAGE_EPG_URLS_KEY = 'nrt_epg_urls';
 
 export default function App() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -28,8 +30,20 @@ export default function App() {
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isEpgLoading, setIsEpgLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBotBlocked, setIsBotBlocked] = useState(false);
+
+  const [epgUrls, setEpgUrls] = useState<string[]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_EPG_URLS_KEY) || '[]');
+      return stored.length > 0 ? stored : [
+        'https://raw.githubusercontent.com/dhasap/dhanytv/main/epg.xml'
+      ];
+    } catch {
+      return ['https://raw.githubusercontent.com/dhasap/dhanytv/main/epg.xml'];
+    }
+  });
 
   // Favorites & Recents State
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -221,6 +235,19 @@ export default function App() {
     }
   };
 
+  const loadEpgForChannels = async (currentChannels: Channel[], urls: string[]) => {
+    if (urls.length === 0 || currentChannels.length === 0) return;
+    setIsEpgLoading(true);
+    let updatedChannels = [...currentChannels];
+    
+    for (const url of urls) {
+       updatedChannels = await fetchAndParseEPG(url, updatedChannels);
+    }
+    
+    setChannels([...updatedChannels]); // Trigger re-render
+    setIsEpgLoading(false);
+  };
+
   const applyChannels = (newChannels: Channel[], source: PlaylistSource) => {
     setChannels(newChannels);
     setActiveSource(source);
@@ -243,6 +270,8 @@ export default function App() {
         const match = newChannels.find((c) => c.name === prev.name);
         return match || newChannels[0];
       });
+      // Load EPG automatically
+      loadEpgForChannels(newChannels, epgUrls);
     } else {
       setActiveChannel(null);
     }
@@ -484,9 +513,26 @@ export default function App() {
                     <h2 className="text-xl sm:text-2xl font-extrabold text-white truncate tracking-tight drop-shadow-sm">
                       {activeChannel.name}
                     </h2>
-                    <p className="mt-1 text-xs sm:text-sm text-slate-400 font-medium tracking-wide">
-                      Now streaming on NRT
-                    </p>
+                    {getCurrentProgram(activeChannel.epg) ? (
+                      <div className="mt-2 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-indigo-300">
+                           <Calendar className="w-3.5 h-3.5" />
+                           <span className="truncate">{getCurrentProgram(activeChannel.epg)?.title}</span>
+                        </div>
+                        {getCurrentProgram(activeChannel.epg)?.description && (
+                           <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                             {getCurrentProgram(activeChannel.epg)?.description}
+                           </p>
+                        )}
+                        <p className="text-[10px] font-bold tracking-wider text-slate-500 uppercase mt-0.5">
+                           {getCurrentProgram(activeChannel.epg)?.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {getCurrentProgram(activeChannel.epg)?.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-xs sm:text-sm text-slate-400 font-medium tracking-wide">
+                        Now streaming on NRT
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

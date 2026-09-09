@@ -97,6 +97,7 @@ export function parseM3U(m3uContent: string): Channel[] {
       const url = line;
       channels.push({
         id: `${channels.length + 1}-${currentInfo.name}`,
+        tvgId: currentInfo.id !== `${channels.length + 1}` ? currentInfo.id : undefined,
         name: currentInfo.name || 'Live Channel',
         logo: currentInfo.logo || '',
         category: currentInfo.category || 'Live Event',
